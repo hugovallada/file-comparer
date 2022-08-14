@@ -18,5 +18,10 @@ Aplicação via linha de comando que permite comparar arquivos linha por linha.
         Nesse modo, todos os arquivos passados serão comparados.
 
 ## Modo de comparação:
-    Quantidade de linhas e conteúdo de cada linha, excluindo os espaços iniciais e finais. 
+    Quantidade de linhas e conteúdo de cada linha, excluindo os espaços iniciais e finais.
+
+### Tipos de arquivos já testados:
+    - .txt
+    - .yaml/.yml
+    - .json
     
