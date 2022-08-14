@@ -1,108 +1,47 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
 	"sync"
-	"time"
+
+	"com.github.hugovallada/file-comparer/src/args"
+	"com.github.hugovallada/file-comparer/src/data"
+	exec "com.github.hugovallada/file-comparer/src/executor"
+	"com.github.hugovallada/file-comparer/src/files"
 )
 
-type Data struct {
-	NumberOfLines int
-	Content       []string
-}
-
-func (d *Data) validate(data Data) {
-	if d.NumberOfLines != data.NumberOfLines {
-		panic(fmt.Sprintf("O número de linhas é diferente: Esperava %d, mas recebeu %d\n", d.NumberOfLines, data.NumberOfLines))
-	}
-
-	for index, line := range d.Content {
-		if line != data.Content[index] {
-			panic(fmt.Sprintf("O conteúdo da linha é diferente: Esperava %s, mas recebeu %s\n", line, data.Content[index]))
-		}
-	}
-}
-
-func (d *Data) IsEqualTo(datas ...Data) {
-	for _, data := range datas {
-		d.validate(data)
-	}
-}
-
-var wg sync.WaitGroup
-
-func executor(fn func()) {
-	startTime := time.Now()
-	fn()
-	fmt.Println("Duração:", time.Since(startTime))
-}
-
 func main() {
-	executor(func() {
-		files := []string{"./files/ancestral.txt", "./files/atual.txt"}
-		size := len(files)
+	exec.TimedExecution(func() {
+		source := args.ValidateArgs()
+		args := args.GetArgs(source)
 
-		wg.Add(size)
-		channel := make(chan Data, size)
+		channel := make(chan data.Data, args.NumberOfFiles)
 
-		go readFile(files[0], channel)
-		go readFile(files[1], channel)
+		var ww sync.WaitGroup
 
-		wg.Wait()
+		ww.Add(args.NumberOfFiles)
 
-		validateFiles(getData(size, channel))
+		fileReaders := files.GenerateFileReaderFromArgs(args.FileNames, channel, &ww)
 
+		for _, fileReader := range fileReaders {
+			go files.ReadFile(fileReader)
+		}
+
+		ww.Wait()
+
+		allData := getDatas(args.NumberOfFiles, channel)
+		validateAllFiles(allData)
 		fmt.Println("Sucesso")
 	})
 }
 
-func getData(size int, channel chan Data) (datas []Data) {
+func getDatas(size int, channel chan data.Data) (datas []data.Data) {
 	for i := 0; i < size; i++ {
 		datas = append(datas, <-channel)
 	}
 	return
 }
 
-func validateFiles(datas []Data) {
-	data1, data2 := datas[0], datas[1]
-
-	data1.validate(data2)
-	// if datas[0].NumberOfLines != datas[1].NumberOfLines {
-	// 	panic("Numero de linhas diferentes")
-	// }
-
-	// for ind, line := range datas[0].Content {
-	// 	if line != datas[1].Content[ind] {
-	// 		panic("Conteudo de linha diferentes")
-	// 	}
-	// }
-}
-
-func readFile(fileName string, channel chan Data) {
-	defer wg.Done()
-	file, err := os.OpenFile(fileName, os.O_RDONLY, os.ModeAppend)
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	defer file.Close()
-
-	reader := bufio.NewScanner(file)
-
-	reader.Split(bufio.ScanLines)
-
-	var lines []string
-
-	for reader.Scan() {
-		lines = append(lines, strings.TrimSpace(reader.Text()))
-	}
-
-	data := Data{len(lines), lines}
-
-	channel <- data
+func validateAllFiles(datas []data.Data) {
+	datas[0].Compare(datas[1:]...)
 }
