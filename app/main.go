@@ -17,17 +17,17 @@ func main() {
 
 		channel := make(chan data.Data, args.NumberOfFiles)
 
-		var ww sync.WaitGroup
+		var wg sync.WaitGroup
 
-		ww.Add(args.NumberOfFiles)
+		wg.Add(args.NumberOfFiles)
 
-		fileReaders := files.GenerateFileReaderFromArgs(args.FileNames, channel, &ww)
+		fileReaders := files.GenerateFileReaderFromArgs(args.FileNames, channel, &wg)
 
 		for _, fileReader := range fileReaders {
 			go files.ReadFile(fileReader)
 		}
 
-		ww.Wait()
+		wg.Wait()
 
 		allData := getDatas(args.NumberOfFiles, channel)
 		validateAllFiles(allData)
